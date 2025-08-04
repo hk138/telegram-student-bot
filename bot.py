@@ -106,8 +106,7 @@ if __name__ == "__main__":
     app.add_handler(conv_handler)
     app.run_polling()
 
-    return "Student Bot is running."
-
+ 
 # اجرای اپلیکیشن Flask (برای اجرا در local یا debug لازم نیست)
 if __name__ == "__main__":
     app.run()
