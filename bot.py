@@ -57,7 +57,7 @@ async def health_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Student Bot is running.")
 
 def main():
-    application = ApplicationBuilder().token("توکن ربات خودت").build()
+    application = ApplicationBuilder().token("8117664156:AAFdfRxZ-7t0qXdQ_FUrcBbC7dY23Xs5BFw").build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("ping", health_check))
