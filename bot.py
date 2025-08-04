@@ -1,113 +1,77 @@
 import logging
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler,
+    MessageHandler, ContextTypes, filters, ConversationHandler
+)
 import os
-from flask import Flask, request
-from telegram import Update, Bot
-from telegram.ext import Dispatcher, CommandHandler, MessageHandler, Filters, CallbackContext
-import openai
 
-# راه‌اندازی لاگ
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# گرفتن توکن‌ها از متغیر محیطی
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ASKING, = range(1)
 
-# مقداردهی اولیه
-bot = Bot(token=BOT_TOKEN)
-app = Flask(__name__)
-dispatcher = Dispatcher(bot, None, workers=0)
-
-# اتصال به OpenAI
-openai.api_key = OPENAI_API_KEY
-
-# سوالات مشاوره‌ای مرحله‌ای
-questions = [
-    "در چه پایه‌ای هستی؟ (دهم / یازدهم / دوازدهم)",
-    "هدفت از درس خوندن چیه؟",
-    "چند ساعت در روز درس می‌خونی؟",
-    "قوی‌ترین درس‌هات کدوما هستن؟",
-    "ضعیف‌ترین درس‌هات کدوما هستن؟",
-    "به نظرت نقطه قوتت چیه؟",
-    "به نظرت نقطه ضعفت چیه؟",
-    "چرا بعضی وقتا حس درس خوندن نداری؟",
-    "آزمون خاصی شرکت می‌کنی؟ اگه آره، اسمش؟",
-    "آخرین رتبه یا تراز آزمونت چی بوده؟",
-    "چه روش یادگیری رو ترجیح می‌دی؟ (مطالعه، ویدیو، خلاصه‌نویسی و ...)",
-    "دوست داری چه رشته‌ای قبول بشی؟",
+QUESTIONS = [
+    "در چه پایه‌ای تحصیل می‌کنی؟",
+    "هدفت از کنکور چیه؟",
+    "چند ساعت در روز مطالعه می‌کنی؟",
+    "نقطه ضعفت چیه؟",
+    "نقطه قوتت چیه؟",
+    "علت اینکه بعضی اوقات حس درس خوندن نداری چیه؟",
+    "آزمون خاصی شرکت می‌کنی؟",
+    "آخرین نتیجه آزمونت چی بوده؟ تراز یا رتبه؟",
+    "چه روش یادگیری رو ترجیح میدی؟ (مطالعه، دیدن ویدیو)",
+    "چه رشته‌ای دوست داری قبول بشی؟",
     "چه دانشگاهی مد نظرت هست؟",
-    "صبح‌ها بهتر درس می‌خونی یا شب‌ها؟",
-    "منابعی که داری رو بگو (برای هر درس چی داری؟)"
+    "صبح‌ها بیشتر سرحالی یا شب‌ها؟",
+    "چه منابعی برای هر درس داری؟"
 ]
 
-# نگهداری وضعیت گفتگو
-user_states = {}
+user_answers = {}
 
-def start(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    user_states[chat_id] = {
-        "step": 0,
-        "answers": []
-    }
-    update.message.reply_text("سلام! من ربات مشاور کنکور هستم. بیا با چند سوال شروع کنیم 😊")
-    update.message.reply_text(questions[0])
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_answers[user_id] = []
+    context.user_data["q_index"] = 0
+    await update.message.reply_text("سلام! وقت بخیر 👋\nقراره چند تا سؤال ازت بپرسم...")
+    await update.message.reply_text(QUESTIONS[0])
+    return ASKING
 
-def handle_message(update: Update, context: CallbackContext):
-    chat_id = update.effective_chat.id
-    text = update.message.text
+async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    answer = update.message.text
+    user_answers[user_id].append(answer)
+    q_index = context.user_data["q_index"] + 1
+    context.user_data["q_index"] = q_index
 
-    if chat_id not in user_states:
-        update.message.reply_text("لطفاً /start رو بزن تا شروع کنیم.")
-        return
-
-    state = user_states[chat_id]
-    step = state["step"]
-
-    # ذخیره پاسخ
-    state["answers"].append(text)
-    state["step"] += 1
-
-    # ادامه سوالات
-    if state["step"] < len(questions):
-        update.message.reply_text(questions[state["step"]])
+    if q_index < len(QUESTIONS):
+        await update.message.reply_text(QUESTIONS[q_index])
+        return ASKING
     else:
-        update.message.reply_text("مرسی! در حال تحلیل پاسخ‌هات هستم...")
+        await update.message.reply_text("ممنون! اطلاعاتت ثبت شد. در حال تحلیل پاسخ‌هات هستم...")
+        # اینجا میشه پاسخ‌ها رو برای تحلیل به API فرستاد
+        return ConversationHandler.END
 
-        # ارسال به OpenAI
-        prompt = "\n".join(
-            f"{i+1}. {q}\nپاسخ: {a}"
-            for i, (q, a) in enumerate(zip(questions, state["answers"]))
-        )
-        prompt += "\n\nبر اساس این پاسخ‌ها، یک برنامه‌ریزی مشاوره‌ای و انگیزشی مناسب ارائه بده."
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("مکالمه لغو شد.")
+    return ConversationHandler.END
 
-        try:
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}]
-            )
-            reply = response.choices[0].message["content"]
-            update.message.reply_text(reply)
-        except Exception as e:
-            logger.error(e)
-            update.message.reply_text("مشکلی در ارتباط با GPT پیش اومد. لطفاً دوباره تلاش کن.")
+def main():
+    token = os.environ.get("BOT_TOKEN")
+    app = ApplicationBuilder().token(token).build()
 
-        # پاک‌سازی وضعیت کاربر
-        del user_states[chat_id]
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={ASKING: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer)]},
+        fallbacks=[CommandHandler("cancel", cancel)]
+    )
 
-# هندلرها
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    app.add_handler(conv_handler)
+    app.run_polling()
 
-# مسیر Webhook برای Render
-@app.route("/", methods=["POST"])
-def webhook():
-    update = Update.de_json(request.get_json(force=True), bot)
-    dispatcher.process_update(update)
-    return "ok"
+if __name__ == "__main__":
+    main()
 
-# صفحه اصلی برای تست سریع
-@app.route("/", methods=["GET"])
-def index():
     return "Student Bot is running."
 
 # اجرای اپلیکیشن Flask (برای اجرا در local یا debug لازم نیست)
