@@ -72,6 +72,11 @@ def main():
 if __name__ == "__main__":
     main()
 
+    from flask import Flask
+app = Flask(__name__)
+
+@app.route('/')
+def home():
     return "Student Bot is running."
 
 # اجرای اپلیکیشن Flask (برای اجرا در local یا debug لازم نیست)
