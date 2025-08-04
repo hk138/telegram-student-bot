@@ -6,8 +6,20 @@ import openai
 import os
 
 # ست کردن توکن‌های مورد نیاز
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "توکن رباتت اینجا")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "توکن OpenAI اینجا")
+import sys
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not TELEGRAM_BOT_TOKEN:
+    print("❌ TELEGRAM_BOT_TOKEN is missing!")
+    sys.exit(1)
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    print("❌ OPENAI_API_KEY is missing!")
+    sys.exit(1)
+
+openai.api_key = OPENAI_API_KEY
+
 openai.api_key = OPENAI_API_KEY
 
 logging.basicConfig(level=logging.INFO)
