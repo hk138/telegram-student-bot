@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # توکن بات تلگرام
-TOKEN = "توکن_بات_تو"
+TOKEN = "8117664156:AAFdfRxZ-7t0qXdQ_FUrcBbC7dY23Xs5BFw"
 
 # سوالات مرحله مشاوره
 questions = [
@@ -71,3 +71,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
