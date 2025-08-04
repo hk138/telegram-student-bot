@@ -81,7 +81,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 if __name__ == "__main__":
-    app = ApplicationBuilder().token("توکن_ربات_تو_اینجا").build()
+    app = ApplicationBuilder().token("8117664156:AAFdfRxZ-7t0qXdQ_FUrcBbC7dY23Xs5BFw").build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
