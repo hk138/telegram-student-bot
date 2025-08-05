@@ -48,10 +48,8 @@ async def handle_goal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_study_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["ساعات مطالعه"] = update.message.text
-    await update.message.reply_text(
-        "برای شروع، بگو چه درس‌هایی رو بیشتر دوست داری و کدوم‌ها برات چالش‌انگیزترن؟ "
-        "(مثلاً ریاضی، زیست، ادبیات...)"
-    )
+    await update.message.reply_text("برای شروع، بگو چه درس‌هایی رو بیشتر دوست داری و کدوم‌ها برات چالش‌انگیزترن؟ (مثلاً ریاضی، زیست، ادبیات...)")
+
     return STRENGTHS
 
 async def handle_strengths(update: Update, context: ContextTypes.DEFAULT_TYPE):
