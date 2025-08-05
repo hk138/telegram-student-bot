@@ -1,59 +1,112 @@
-import logging
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-
-import openai
 import os
+import openai
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
 
-# ست کردن توکن‌های مورد نیاز
-import sys
-
+# گرفتن توکن‌ها از متغیرهای محیطی
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-if not TELEGRAM_BOT_TOKEN:
-    print("❌ TELEGRAM_BOT_TOKEN is missing!")
-    sys.exit(1)
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-    print("❌ OPENAI_API_KEY is missing!")
-    sys.exit(1)
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-3.5-turbo")
+
+if not TELEGRAM_BOT_TOKEN or not OPENAI_API_KEY:
+    raise ValueError("توکن تلگرام یا کلید OpenAI وارد نشده‌اند.")
 
 openai.api_key = OPENAI_API_KEY
 
-openai.api_key = OPENAI_API_KEY
+# مراحل مکالمه
+(
+    GRADE, GOAL, STUDY_HOURS, STRENGTHS, WEAKNESSES,
+    LEARNING_STYLE, TESTS, SOURCES, CONFIRM
+) = range(9)
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+user_data = {}
 
-# پیام شروع
+# شروع مکالمه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! به ربات مشاور کنکور خوش اومدی. سوالاتت رو بپرس یا شروع کن تا راهنمایی‌ات کنم.")
+    await update.message.reply_text("سلام! من ربات مشاور کنکور هستم 🎓\n\nابتدا بگو پایه تحصیلی‌ات چیست؟ (دهم / یازدهم / دوازدهم)")
+    return GRADE
 
-# پیام متنی از کاربر
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-    await update.message.reply_text("در حال فکر کردن روی پاسخ...")
+async def handle_grade(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["پایه"] = update.message.text
+    await update.message.reply_text("هدفت در کنکور چیست؟ (رشته، دانشگاه، رتبه و...)")
+    return GOAL
 
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "تو یک مشاور کنکور دلسوز و دقیق هستی که به دانش‌آموزان کمک می‌کنی تا بهترین نتیجه را بگیرند."},
-                {"role": "user", "content": user_message}
-            ]
-        )
-        reply = response.choices[0].message.content.strip()
-        await update.message.reply_text(reply)
-    except Exception as e:
-        logger.error(f"خطا در دریافت پاسخ از OpenAI: {e}")
-        await update.message.reply_text("متأسفم، مشکلی در ارتباط با ChatGPT پیش اومد.")
+async def handle_goal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["هدف"] = update.message.text
+    await update.message.reply_text("روزانه چند ساعت درس می‌خوانی؟")
+    return STUDY_HOURS
 
-# اجرا
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+async def handle_study_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["ساعات مطالعه"] = update.message.text
+    await update.message.reply_text("نقاط قوتت در درس‌ها چیست؟")
+    return STRENGTHS
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+async def handle_strengths(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["نقاط قوت"] = update.message.text
+    await update.message.reply_text("نقاط ضعفت در درس‌ها چیست؟")
+    return WEAKNESSES
 
-    print("ربات اجرا شد.")
+async def handle_weaknesses(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["نقاط ضعف"] = update.message.text
+    await update.message.reply_text("روش یادگیری‌ات چطوریه؟ (خواندن، دیدن ویدیو، خلاصه‌نویسی و...)")
+    return LEARNING_STYLE
+
+async def handle_learning_style(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["روش یادگیری"] = update.message.text
+    await update.message.reply_text("آیا در آزمون آزمایشی شرکت می‌کنی؟ اگر آره کدام؟")
+    return TESTS
+
+async def handle_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["آزمون"] = update.message.text
+    await update.message.reply_text("چه منابعی استفاده می‌کنی؟ (کتاب‌ها، معلم‌ها، ویدیوها و...)")
+    return SOURCES
+
+async def handle_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_data["منابع"] = update.message.text
+    await update.message.reply_text("✅ اطلاعات دریافت شد. دارم برات یه مشاوره دقیق آماده می‌کنم...")
+    
+    prompt = "یک مشاور کنکور هوشمند هستی. با اطلاعات زیر یک برنامه و مشاوره کوتاه بده:\n\n"
+    for key, value in user_data.items():
+        prompt += f"{key}: {value}\n"
+    
+    response = await openai.ChatCompletion.acreate(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": "شما یک مشاور کنکور هستید که با زبان فارسی مشاوره می‌دهید."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    
+    reply = response.choices[0].message.content.strip()
+    await update.message.reply_text("📌 مشاوره شما:\n\n" + reply)
+
+    return ConversationHandler.END
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("مکالمه لغو شد.")
+    return ConversationHandler.END
+
+# راه‌اندازی برنامه
+def main():
+    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            GRADE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_grade)],
+            GOAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_goal)],
+            STUDY_HOURS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_study_hours)],
+            STRENGTHS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_strengths)],
+            WEAKNESSES: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_weaknesses)],
+            LEARNING_STYLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_learning_style)],
+            TESTS: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tests)],
+            SOURCES: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_sources)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+    app.add_handler(conv_handler)
     app.run_polling()
+
+if __name__ == "__main__":
+    main()
