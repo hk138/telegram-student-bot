@@ -1,33 +1,39 @@
 import os
-import openai
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+from telegram.ext import (
+    Application, CommandHandler, MessageHandler, filters,
+    ConversationHandler, ContextTypes
+)
 from openai import AsyncOpenAI
-import os
 
+# اتصال به GPT
 client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # گرفتن توکن‌ها از متغیرهای محیطی
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-3.5-turbo")
 
 if not TELEGRAM_BOT_TOKEN or not OPENAI_API_KEY:
     raise ValueError("توکن تلگرام یا کلید OpenAI وارد نشده‌اند.")
 
-openai.api_key = OPENAI_API_KEY
-
 # مراحل مکالمه
 (
     GRADE, GOAL, STUDY_HOURS, STRENGTHS, WEAKNESSES,
-    LEARNING_STYLE, TESTS, SOURCES, CONFIRM
-) = range(9)
+    LEARNING_STYLE, TESTS, SOURCES
+) = range(8)
 
+# دیتای کاربر
 user_data = {}
 
 # شروع مکالمه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! من ربات مشاور کنکور هستم 🎓\n خوبی عزیزم! 🤍 خوشحالم که تصمیم گرفتی برای کنکورت برنامه‌ریزی هوشمندانه داشته باشی. من اینجا هستم تا کمکت کنم\n\n  حالا چند تا سوال میپرسم تا بیشتر باهات آشنا بشم\n\nابتدا بگو پایه تحصیلی‌ات چیست؟ (دهم / یازدهم / دوازدهم)")
+    await update.message.reply_text(
+        "سلام! من ربات مشاور کنکور هستم 🎓\n"
+        "خوبی عزیزم! 🤍 خوشحالم که تصمیم گرفتی برای کنکورت برنامه‌ریزی هوشمندانه داشته باشی. "
+        "من اینجا هستم تا کمکت کنم.\n\n"
+        "حالا چند تا سوال می‌پرسم تا بیشتر باهات آشنا بشم.\n\n"
+        "ابتدا بگو پایه تحصیلی‌ات چیست؟ (دهم / یازدهم / دوازدهم)"
+    )
     return GRADE
 
 async def handle_grade(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,12 +48,18 @@ async def handle_goal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_study_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["ساعات مطالعه"] = update.message.text
-    await update.message.reply_text("برای شروع، بگو چه درس‌هایی رو بیشتر دوست داری و کدوم‌ها برات چالش‌انگیزترن؟ (مثلاً ریاضی، زیست، ادبیات...)")
+    await update.message.reply_text(
+        "برای شروع، بگو چه درس‌هایی رو بیشتر دوست داری و کدوم‌ها برات چالش‌انگیزترن؟ "
+        "(مثلاً ریاضی، زیست، ادبیات...)"
+    )
     return STRENGTHS
 
 async def handle_strengths(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["نقاط قوت"] = update.message.text
-    await update.message.reply_text("استرس یا نگرانی خاصی داری که بخوای راجع بهش حرف بزنی؟ (مثلاً وقت کم میاری، تمرکز نداری، یا منابعت نامشخصه؟)")
+    await update.message.reply_text(
+        "استرس یا نگرانی خاصی داری که بخوای راجع بهش حرف بزنی؟ "
+        "(مثلاً وقت کم میاری، تمرکز نداری، یا منابعت نامشخصه؟)"
+    )
     return WEAKNESSES
 
 async def handle_weaknesses(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -68,32 +80,34 @@ async def handle_tests(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["منابع"] = update.message.text
     await update.message.reply_text("✅ اطلاعات دریافت شد. دارم برات یه مشاوره دقیق آماده می‌کنم...")
-    
-    prompt = "یک مشاور کنکور هوشمند هستی. با اطلاعات زیر یک برنامه و مشاوره کوتاه بده:\n\n"
+
+    # ساخت پرامپت برای GPT
+    prompt = "تو یک مشاور کنکور هوشمند هستی. با اطلاعات زیر یک برنامه و مشاوره دقیق بده:\n\n"
     for key, value in user_data.items():
         prompt += f"{key}: {value}\n"
-    
-    response = await client.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=[
-        {"role": "system", "content": "تو یک مشاور کنکور هستی"},
-        {"role": "user", "content": "سوالات کاربر..."}
-    ]
-)
 
-await update.message.reply_text(response.choices[0].message.content)
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "تو یک مشاور کنکور هستی."},
+                {"role": "user", "content": prompt}
+            ]
+        )
 
-    
-    reply = response.choices[0].message.content.strip()
-    await update.message.reply_text("📌 مشاوره شما:\n\n" + reply)
+        reply = response.choices[0].message.content.strip()
+        await update.message.reply_text("📌 مشاوره شما:\n\n" + reply)
+
+    except Exception as e:
+        await update.message.reply_text("❌ مشکلی در دریافت پاسخ از GPT رخ داد:\n" + str(e))
 
     return ConversationHandler.END
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("مکالمه لغو شد.")
+    await update.message.reply_text("⛔️ مکالمه لغو شد.")
     return ConversationHandler.END
 
-# راه‌اندازی برنامه
+# اجرای ربات
 def main():
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
 
