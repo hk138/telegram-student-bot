@@ -2,6 +2,10 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 user_data = {}
+
+import os
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
+
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
     "۲. رشته‌ت چیه؟ (ریاضی / تجربی / انسانی / هنر / زبان)",
@@ -56,8 +60,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🧑‍🎓 اطلاعات مربوط به آیدی کاربر: {user_id}\n"
             "✳️ در حال پردازش برنامه‌ریزی هستیم، تا چند دقیقه دیگه برنامه اختصاصی‌ت آماده می‌شه."
         )
-        # اینجا می‌تونی جواب‌ها رو ذخیره کنی یا به جای دیگه بفرستی
-        print("پاسخ‌های کاربر:", data["answers"])
+
+        # ارسال اطلاعات به ادمین
+        answer_text = "\n".join([f"{i+1}. {questions[i]} \n➤ {ans}" for i, ans in enumerate(data["answers"])])
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 مشاوره جدید از کاربر {user_id}:\n\n{answer_text}")
+
         del user_data[user_id]
 
 if __name__ == "__main__":
