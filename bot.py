@@ -2,6 +2,10 @@ import os
 import openai
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, ContextTypes
+from openai import AsyncOpenAI
+import os
+
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # گرفتن توکن‌ها از متغیرهای محیطی
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -23,7 +27,7 @@ user_data = {}
 
 # شروع مکالمه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("سلام! من ربات مشاور کنکور هستم 🎓\n\nابتدا بگو پایه تحصیلی‌ات چیست؟ (دهم / یازدهم / دوازدهم)")
+    await update.message.reply_text("سلام! من ربات مشاور کنکور هستم 🎓\n خوبی عزیزم! 🤍 خوشحالم که تصمیم گرفتی برای کنکورت برنامه‌ریزی هوشمندانه داشته باشی. من اینجا هستم تا کمکت کنم\n\n  حالا چند تا سوال میپرسم تا بیشتر باهات آشنا بشم\n\nابتدا بگو پایه تحصیلی‌ات چیست؟ (دهم / یازدهم / دوازدهم)")
     return GRADE
 
 async def handle_grade(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -38,12 +42,12 @@ async def handle_goal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_study_hours(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["ساعات مطالعه"] = update.message.text
-    await update.message.reply_text("نقاط قوتت در درس‌ها چیست؟")
+    await update.message.reply_text(""برای شروع، بگو چه درس‌هایی رو بیشتر دوست داری و کدوم‌ها برات چالش‌انگیزترن؟ (مثلاً ریاضی، زیست، ادبیات...)"")
     return STRENGTHS
 
 async def handle_strengths(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_data["نقاط قوت"] = update.message.text
-    await update.message.reply_text("نقاط ضعفت در درس‌ها چیست؟")
+    await update.message.reply_text("استرس یا نگرانی خاصی داری که بخوای راجع بهش حرف بزنی؟ (مثلاً وقت کم میاری، تمرکز نداری، یا منابعت نامشخصه؟)")
     return WEAKNESSES
 
 async def handle_weaknesses(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -69,13 +73,16 @@ async def handle_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for key, value in user_data.items():
         prompt += f"{key}: {value}\n"
     
-    response = await openai.ChatCompletion.acreate(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": "شما یک مشاور کنکور هستید که با زبان فارسی مشاوره می‌دهید."},
-            {"role": "user", "content": prompt}
-        ]
-    )
+    response = await client.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[
+        {"role": "system", "content": "تو یک مشاور کنکور هستی"},
+        {"role": "user", "content": "سوالات کاربر..."}
+    ]
+)
+
+await update.message.reply_text(response.choices[0].message.content)
+
     
     reply = response.choices[0].message.content.strip()
     await update.message.reply_text("📌 مشاوره شما:\n\n" + reply)
