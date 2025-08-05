@@ -1,3 +1,4 @@
-# config.py
-BOT_TOKEN = '8117664156:AAFdfRxZ-7t0qXdQ_FUrcBbC7dY23Xs5BFw'
-ADMIN_ID = 6899358433
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
