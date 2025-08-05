@@ -1,3 +1,3 @@
 # config.py
-BOT_TOKEN = 'توکن ربات تلگرام'
-ADMIN_ID = 123456789  # آیدی عددی ادمین تلگرام (مثلاً آیدی خودت)
+BOT_TOKEN = '8117664156:AAFdfRxZ-7t0qXdQ_FUrcBbC7dY23Xs5BFw'
+ADMIN_ID = 6899358433
