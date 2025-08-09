@@ -77,3 +77,34 @@ if __name__ == "__main__":
 
     print("ربات اجرا شد...")
     app.run_polling()
+import pkg from 'pg';
+const { Pool } = pkg;
+
+// متصل شدن به دیتابیس
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL, // این متغیر رو از Railway یا فایل محیطی بردار
+});
+
+// کد ساخت جداول
+async function createTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users(
+      user_id BIGINT PRIMARY KEY,
+      username TEXT,
+      first_name TEXT,
+      topic_id BIGINT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS messages(
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT REFERENCES users(user_id),
+      direction TEXT,
+      text TEXT,
+      ts TIMESTAMP DEFAULT NOW()
+    );
+  `);
+}
+
+createTables().then(() => {
+  console.log("Tables created!");
+}).catch(e => console.error('Error creating tables:', e));
