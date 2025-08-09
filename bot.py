@@ -104,7 +104,80 @@ async function createTables() {
     );
   `);
 }
-
 createTables().then(() => {
   console.log("Tables created!");
 }).catch(e => console.error('Error creating tables:', e));
+
+
+// اضافه کردن به کد پروژه در فایل اصلی
+bot.on('message', async (ctx) => {
+  // فقط چت‌های خصوصی کاربر را هندل کن
+  if (ctx.chat.type !== 'private') return;
+
+  const user = ctx.from;
+  const text = ctx.message.text || '(non-text)';
+
+  // بررسی اگر کاربر قبلاً یک topic_id داشته باشد
+  const topicId = await ensureTopicForUser(user);
+
+  // ذخیره پیام در دیتابیس
+  await pool.query(
+    'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
+    [user.id, 'IN', text]
+  );
+
+  // ارسال پیام به گروه فوروم در تاپیک مربوطه
+  await bot.telegram.sendMessage(
+    ADMIN_FORUM_ID,
+    `👤 ${user.first_name ?? ''}${user.username ? ' (@' + user.username + ')' : ''}\n${text}`,
+    { message_thread_id: topicId }
+  );
+});
+
+// هندلر پیام‌های ادمین در گروه فوروم
+bot.on('message', async (ctx) => {
+  // فقط پیام‌های داخل گروه فوروم رو هندل کن
+  if (ctx.chat.id !== ADMIN_FORUM_ID) return;
+  
+  const topicId = ctx.message.message_thread_id;
+  if (!topicId) return;
+  if (ctx.from.is_bot) return; // پیام‌های ربات‌ها رو عبور بده
+
+  // پیدا کردن کاربر مربوط به این topic_id
+  const res = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [topicId]);
+  if (res.rowCount === 0) return;
+
+  const user_id = res.rows[0].user_id;
+  const text = ctx.message.text || '(non-text)';
+
+  // ارسال پیام به کاربر
+  await bot.telegram.sendMessage(user_id, text);
+  await pool.query(
+    'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
+    [user_id, 'OUT', text]
+  );
+});
+
+// هندلر پیام‌های ادمین در گروه فوروم
+bot.on('message', async (ctx) => {
+  // فقط پیام‌های داخل گروه فوروم رو هندل کن
+  if (ctx.chat.id !== ADMIN_FORUM_ID) return;
+  
+  const topicId = ctx.message.message_thread_id;
+  if (!topicId) return;
+  if (ctx.from.is_bot) return; // پیام‌های ربات‌ها رو عبور بده
+
+  // پیدا کردن کاربر مربوط به این topic_id
+  const res = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [topicId]);
+  if (res.rowCount === 0) return;
+
+  const user_id = res.rows[0].user_id;
+  const text = ctx.message.text || '(non-text)';
+
+  // ارسال پیام به کاربر
+  await bot.telegram.sendMessage(user_id, text);
+  await pool.query(
+    'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
+    [user_id, 'OUT', text]
+  );
+});
