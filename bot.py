@@ -80,12 +80,12 @@ if __name__ == "__main__":
 import pkg from 'pg';
 const { Pool } = pkg;
 
-// متصل شدن به دیتابیس
+# متصل شدن به دیتابیس
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // این متغیر رو از Railway یا فایل محیطی بردار
+  connectionString: process.env.DATABASE_URL, # این متغیر رو از Railway یا فایل محیطی بردار
 });
 
-// کد ساخت جداول
+# کد ساخت جداول
 async function createTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users(
@@ -109,24 +109,24 @@ createTables().then(() => {
 }).catch(e => console.error('Error creating tables:', e));
 
 
-// اضافه کردن به کد پروژه در فایل اصلی
+# اضافه کردن به کد پروژه در فایل اصلی
 bot.on('message', async (ctx) => {
-  // فقط چت‌های خصوصی کاربر را هندل کن
+  # فقط چت‌های خصوصی کاربر را هندل کن
   if (ctx.chat.type !== 'private') return;
 
   const user = ctx.from;
   const text = ctx.message.text || '(non-text)';
 
-  // بررسی اگر کاربر قبلاً یک topic_id داشته باشد
+  # بررسی اگر کاربر قبلاً یک topic_id داشته باشد
   const topicId = await ensureTopicForUser(user);
 
-  // ذخیره پیام در دیتابیس
+  # ذخیره پیام در دیتابیس
   await pool.query(
     'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
     [user.id, 'IN', text]
   );
 
-  // ارسال پیام به گروه فوروم در تاپیک مربوطه
+  # ارسال پیام به گروه فوروم در تاپیک مربوطه
   await bot.telegram.sendMessage(
     ADMIN_FORUM_ID,
     `👤 ${user.first_name ?? ''}${user.username ? ' (@' + user.username + ')' : ''}\n${text}`,
@@ -134,23 +134,23 @@ bot.on('message', async (ctx) => {
   );
 });
 
-// هندلر پیام‌های ادمین در گروه فوروم
+# هندلر پیام‌های ادمین در گروه فوروم
 bot.on('message', async (ctx) => {
-  // فقط پیام‌های داخل گروه فوروم رو هندل کن
+  # فقط پیام‌های داخل گروه فوروم رو هندل کن
   if (ctx.chat.id !== ADMIN_FORUM_ID) return;
   
   const topicId = ctx.message.message_thread_id;
   if (!topicId) return;
-  if (ctx.from.is_bot) return; // پیام‌های ربات‌ها رو عبور بده
+  if (ctx.from.is_bot) return;# پیام‌های ربات‌ها رو عبور بده
 
-  // پیدا کردن کاربر مربوط به این topic_id
+  # پیدا کردن کاربر مربوط به این topic_id
   const res = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [topicId]);
   if (res.rowCount === 0) return;
 
   const user_id = res.rows[0].user_id;
   const text = ctx.message.text || '(non-text)';
 
-  // ارسال پیام به کاربر
+  # ارسال پیام به کاربر
   await bot.telegram.sendMessage(user_id, text);
   await pool.query(
     'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
@@ -158,23 +158,23 @@ bot.on('message', async (ctx) => {
   );
 });
 
-// هندلر پیام‌های ادمین در گروه فوروم
+# هندلر پیام‌های ادمین در گروه فوروم
 bot.on('message', async (ctx) => {
-  // فقط پیام‌های داخل گروه فوروم رو هندل کن
+  # فقط پیام‌های داخل گروه فوروم رو هندل کن
   if (ctx.chat.id !== ADMIN_FORUM_ID) return;
   
   const topicId = ctx.message.message_thread_id;
   if (!topicId) return;
-  if (ctx.from.is_bot) return; // پیام‌های ربات‌ها رو عبور بده
+  if (ctx.from.is_bot) return; # پیام‌های ربات‌ها رو عبور بده
 
-  // پیدا کردن کاربر مربوط به این topic_id
+  # پیدا کردن کاربر مربوط به این topic_id
   const res = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [topicId]);
   if (res.rowCount === 0) return;
 
   const user_id = res.rows[0].user_id;
   const text = ctx.message.text || '(non-text)';
 
-  // ارسال پیام به کاربر
+  # ارسال پیام به کاربر
   await bot.telegram.sendMessage(user_id, text);
   await pool.query(
     'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
