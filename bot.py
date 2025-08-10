@@ -113,7 +113,7 @@ async def ensure_topic_for_user(user_id):
 async def send_message_to_forum(user_id, text, topic_id):
     bot = Bot(token=TOKEN)
     message = f"👤 {user_id} :\n{text}"
-    await bot.send_message(
+    await bot.telegram.send_message(
         chat_id=ADMIN_FORUM_ID,
         text=message,
         message_thread_id=topic_id
