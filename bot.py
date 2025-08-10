@@ -128,3 +128,77 @@ if __name__ == "__main__":
 
     print("ربات اجرا شد...")
     app.run_polling()
+
+
+async def ensure_topic_for_user(user):
+    user_id = user.id
+    conn = await get_db_connection()
+    result = await conn.fetch('SELECT topic_id FROM users WHERE user_id=$1', user_id)
+    if result:
+        return result[0]["topic_id"]
+
+    # اگر موضوع ندارند، یکی بساز
+    title = f"{user.first_name or ''} {user.username or ''} | {user_id}"
+    created = await bot.telegram.create_forum_topic(ADMIN_FORUM_ID, title)
+    topic_id = created['message_thread_id']
+
+    # ذخیره در دیتابیس
+    await conn.execute(
+        'INSERT INTO users(user_id, username, first_name, topic_id) VALUES($1, $2, $3, $4)',
+        user_id, user.username, user.first_name, topic_id
+    )
+    return topic_id
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in user_data:
+        await update.message.reply_text("لطفاً اول /start رو بزن 😊")
+        return
+
+    data = user_data[user_id]
+    step = data["step"]
+    data["answers"].append(update.message.text)
+    step += 1
+
+    # گرفتن topic_id و ارسال پیام به فوروم
+    topic_id = await ensure_topic_for_user(update.effective_user)
+    await bot.telegram.send_message(
+        ADMIN_FORUM_ID, 
+        f"👤 {update.effective_user.first_name or ''} {update.effective_user.username or ''}\n{update.message.text}",
+        message_thread_id=topic_id
+    )
+    # ذخیره پیام در دیتابیس
+    await pool.query(
+        'INSERT INTO messages(user_id, direction, text) VALUES($1,$2,$3)', 
+        [user_id, 'IN', update.message.text]
+    )
+
+    if step < len(questions):
+        data["step"] = step
+        await update.message.reply_text(questions[step])
+    else:
+        await update.message.reply_text("✅ مشاوره ثبت شد!")
+        del user_data[user_id]
+
+
+async def handle_admin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.id != ADMIN_FORUM_ID:
+        return
+    if not update.message.message_thread_id:
+        return
+    if update.message.from_user.is_bot:
+        return
+
+    # پیدا کردن user_id برای تاپیک
+    result = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [update.message.message_thread_id])
+    if result.rowCount == 0:
+        return
+    user_id = result.rows[0].user_id
+
+    # ارسال پیام به کاربر
+    await bot.telegram.send_message(user_id, update.message.text)
+    await pool.query(
+        'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)', 
+        [user_id, 'OUT', update.message.text]
+    )
