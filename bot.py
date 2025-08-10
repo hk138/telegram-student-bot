@@ -1,5 +1,5 @@
 import os
-import psycopg2
+import asyncpg
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -39,13 +39,15 @@ questions = [
     "۲۵. آیا ترجیح می‌دی برنامه‌ریزی دقیق دقیقه‌ای باشه یا فقط کلی؟"
 ]
 
-# اتصال به دیتابیس PostgreSQL
-conn = psycopg2.connect(DATABASE_URL)
-cursor = conn.cursor()
+# اتصال به دیتابیس PostgreSQL با asyncpg
+async def get_db_connection():
+    conn = await asyncpg.connect(DATABASE_URL)
+    return conn
 
-# ساخت جداول دیتابیس در صورت نیاز
-def create_tables():
-    cursor.execute("""
+# ساخت جداول در دیتابیس
+async def create_tables():
+    conn = await get_db_connection()
+    await conn.execute("""
         CREATE TABLE IF NOT EXISTS users(
             user_id BIGINT PRIMARY KEY,
             username TEXT,
@@ -61,9 +63,7 @@ def create_tables():
             ts TIMESTAMP DEFAULT NOW()
         );
     """)
-    conn.commit()
-
-create_tables()
+    await conn.close()
 
 # ذخیره اطلاعات کاربران در حافظه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
