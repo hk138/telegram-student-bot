@@ -127,7 +127,19 @@ if __name__ == "__main__":
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("ربات اجرا شد...")
-    app.run_polling()
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    # تنظیم Webhook
+    app.bot.set_webhook(WEBHOOK_URL + "/webhook")
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    # اجرای ربات به صورت Webhook
+    print("ربات فعال است و Webhook تنظیم شد...")
+    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
+
 
 
 async def ensure_topic_for_user(user):
