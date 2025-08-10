@@ -1,11 +1,16 @@
-from telegram import Update
+import os
+import psycopg2
+from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
+# تنظیمات
 user_data = {}
-
-import os
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_FORUM_ID = os.getenv("ADMIN_FORUM_ID")
+TOKEN = os.getenv("BOT_TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
+# پرسش‌ها
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
     "۲. رشته‌ت چیه؟ (ریاضی / تجربی / انسانی / هنر / زبان)",
@@ -34,12 +39,40 @@ questions = [
     "۲۵. آیا ترجیح می‌دی برنامه‌ریزی دقیق دقیقه‌ای باشه یا فقط کلی؟"
 ]
 
+# اتصال به دیتابیس PostgreSQL
+conn = psycopg2.connect(DATABASE_URL)
+cursor = conn.cursor()
+
+# ساخت جداول دیتابیس در صورت نیاز
+def create_tables():
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            user_id BIGINT PRIMARY KEY,
+            username TEXT,
+            first_name TEXT,
+            topic_id BIGINT,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS messages(
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT REFERENCES users(user_id),
+            direction TEXT, -- 'IN' از سمت کاربر، 'OUT' از سمت شما/بات
+            text TEXT,
+            ts TIMESTAMP DEFAULT NOW()
+        );
+    """)
+    conn.commit()
+
+create_tables()
+
+# ذخیره اطلاعات کاربران در حافظه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data[user_id] = {"step": 0, "answers": []}
     await update.message.reply_text("سلام! برای شروع مشاوره، به چند سوال جواب بده 🌟")
     await update.message.reply_text(questions[0])
 
+# هندل کردن پیام‌های کاربر
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_data:
@@ -65,11 +98,29 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         answer_text = "\n".join([f"{i+1}. {questions[i]} \n➤ {ans}" for i, ans in enumerate(data["answers"])])
         await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 مشاوره جدید از کاربر {user_id}:\n\n{answer_text}")
 
+        # ارسال به گروه فوروم
+        topic_id = await ensure_topic_for_user(user_id)
+        await send_message_to_forum(user_id, answer_text, topic_id)
+
         del user_data[user_id]
 
+# بررسی یا ایجاد topic برای هر کاربر در گروه فوروم
+async def ensure_topic_for_user(user_id):
+    # اینجا کد برای گرفتن یا ایجاد topic_id مربوط به کاربر قرار می‌گیره
+    return user_id  # برای مثال برگشت دادن همان user_id به عنوان topic_id
+
+# ارسال پیام به گروه فوروم
+async def send_message_to_forum(user_id, text, topic_id):
+    bot = Bot(token=TOKEN)
+    message = f"👤 {user_id} :\n{text}"
+    await bot.send_message(
+        chat_id=ADMIN_FORUM_ID,
+        text=message,
+        message_thread_id=topic_id
+    )
+
+# شروع ربات
 if __name__ == "__main__":
-    import os
-    TOKEN = os.getenv("BOT_TOKEN")
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -77,107 +128,3 @@ if __name__ == "__main__":
 
     print("ربات اجرا شد...")
     app.run_polling()
-import pkg from 'pg';
-const { Pool } = pkg;
-
-# متصل شدن به دیتابیس
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, # این متغیر رو از Railway یا فایل محیطی بردار
-});
-
-# کد ساخت جداول
-async function createTables() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users(
-      user_id BIGINT PRIMARY KEY,
-      username TEXT,
-      first_name TEXT,
-      topic_id BIGINT,
-      created_at TIMESTAMP DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS messages(
-      id BIGSERIAL PRIMARY KEY,
-      user_id BIGINT REFERENCES users(user_id),
-      direction TEXT,
-      text TEXT,
-      ts TIMESTAMP DEFAULT NOW()
-    );
-  `);
-}
-createTables().then(() => {
-  console.log("Tables created!");
-}).catch(e => console.error('Error creating tables:', e));
-
-
-# اضافه کردن به کد پروژه در فایل اصلی
-bot.on('message', async (ctx) => {
-  # فقط چت‌های خصوصی کاربر را هندل کن
-  if (ctx.chat.type !== 'private') return;
-
-  const user = ctx.from;
-  const text = ctx.message.text || '(non-text)';
-
-  # بررسی اگر کاربر قبلاً یک topic_id داشته باشد
-  const topicId = await ensureTopicForUser(user);
-
-  # ذخیره پیام در دیتابیس
-  await pool.query(
-    'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
-    [user.id, 'IN', text]
-  );
-
-  # ارسال پیام به گروه فوروم در تاپیک مربوطه
-  await bot.telegram.sendMessage(
-    ADMIN_FORUM_ID,
-    `👤 ${user.first_name ?? ''}${user.username ? ' (@' + user.username + ')' : ''}\n${text}`,
-    { message_thread_id: topicId }
-  );
-});
-
-# هندلر پیام‌های ادمین در گروه فوروم
-bot.on('message', async (ctx) => {
-  # فقط پیام‌های داخل گروه فوروم رو هندل کن
-  if (ctx.chat.id !== ADMIN_FORUM_ID) return;
-  
-  const topicId = ctx.message.message_thread_id;
-  if (!topicId) return;
-  if (ctx.from.is_bot) return;# پیام‌های ربات‌ها رو عبور بده
-
-  # پیدا کردن کاربر مربوط به این topic_id
-  const res = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [topicId]);
-  if (res.rowCount === 0) return;
-
-  const user_id = res.rows[0].user_id;
-  const text = ctx.message.text || '(non-text)';
-
-  # ارسال پیام به کاربر
-  await bot.telegram.sendMessage(user_id, text);
-  await pool.query(
-    'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
-    [user_id, 'OUT', text]
-  );
-});
-
-# هندلر پیام‌های ادمین در گروه فوروم
-bot.on('message', async (ctx) => {
-  # فقط پیام‌های داخل گروه فوروم رو هندل کن
-  if (ctx.chat.id !== ADMIN_FORUM_ID) return;
-  
-  const topicId = ctx.message.message_thread_id;
-  if (!topicId) return;
-  if (ctx.from.is_bot) return; # پیام‌های ربات‌ها رو عبور بده
-
-  # پیدا کردن کاربر مربوط به این topic_id
-  const res = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [topicId]);
-  if (res.rowCount === 0) return;
-
-  const user_id = res.rows[0].user_id;
-  const text = ctx.message.text || '(non-text)';
-
-  # ارسال پیام به کاربر
-  await bot.telegram.sendMessage(user_id, text);
-  await pool.query(
-    'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)',
-    [user_id, 'OUT', text]
-  );
-});
