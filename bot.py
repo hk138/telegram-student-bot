@@ -2,7 +2,6 @@ import os
 import asyncpg
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-import asyncio
 
 # تنظیمات
 user_data = {}
