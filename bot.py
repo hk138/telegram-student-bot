@@ -130,8 +130,9 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # تنظیم Webhook
-    app.bot.set_webhook(WEBHOOK_URL + "/webhook")
+    # تنظیم Webhook با استفاده از await
+    await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
+
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
