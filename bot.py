@@ -9,7 +9,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 ADMIN_FORUM_ID = os.getenv("ADMIN_FORUM_ID")
 TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
-
+WEBHOOK_URL =  os.getenv("WEBHOOK_URL")
 # پرسش‌ها
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
