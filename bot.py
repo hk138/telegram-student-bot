@@ -1,16 +1,12 @@
 import os
 import requests
-import time
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # تنظیمات
 TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # اطمینان حاصل کنید که این URL از HTTPS استفاده می‌کند
+WEBHOOK_URL = "https://sublime-success.up.railway.app"  # URL Webhook شما باید از HTTPS استفاده کند
 ADMIN_ID = os.getenv("ADMIN_ID")
-# بررسی اینکه WEBHOOK_URL از HTTPS استفاده می‌کند
-if not WEBHOOK_URL.startswith("https://"):
-    raise ValueError("Webhook URL must use HTTPS. Please ensure that your URL is secure.")
 
 # پرسش‌ها
 questions = [
