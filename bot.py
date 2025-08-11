@@ -142,4 +142,4 @@ async def main():
 # اجرای برنامه
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())  # اجرای تابع main با asyncio.run
+    asyncio.get_event_loop().run_until_complete(main())  # استفاده از حلقهٔ رویداد موجود
