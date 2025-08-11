@@ -8,6 +8,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # اطمینان حاصل کنید که این URL از HTTPS استفاده می‌کند
 ADMIN_ID = os.getenv("ADMIN_ID")
+# بررسی اینکه WEBHOOK_URL از HTTPS استفاده می‌کند
+if not WEBHOOK_URL.startswith("https://"):
+    raise ValueError("Webhook URL must use HTTPS. Please ensure that your URL is secure.")
 
 # پرسش‌ها
 questions = [
