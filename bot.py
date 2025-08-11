@@ -1,6 +1,5 @@
 import os
 import asyncpg
-import asyncio  # وارد کردن کتابخانه asyncio
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -141,6 +140,7 @@ async def main():
     print("ربات فعال است و Webhook تنظیم شد...")
     await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
-# اجرای حلقه رویداد
+# اجرای ربات به صورت Webhook
 if __name__ == "__main__":
-    asyncio.run(main())
+    # استفاده از app.run_webhook به جای asyncio.run()
+    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
