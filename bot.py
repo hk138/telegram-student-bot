@@ -125,12 +125,11 @@ async def set_webhook_async():
     await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
 
 # شروع ربات
-if __name__ == "__main__":
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
-    import asyncio
-    asyncio.run(set_webhook_async())  # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
+    await set_webhook_async()  # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
@@ -138,6 +137,9 @@ if __name__ == "__main__":
     print("ربات فعال است و Webhook تنظیم شد...")
 
     # اجرای ربات به صورت Webhook
+    await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
+
+# اجرای برنامه
+if __name__ == "__main__":
     import asyncio
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook"))
+    asyncio.run(main())  # اجرای تابع main با asyncio.run
