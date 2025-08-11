@@ -1,5 +1,6 @@
 import os
 import asyncpg
+import asyncio
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -142,5 +143,5 @@ async def main():
 
 # اجرای ربات به صورت Webhook
 if __name__ == "__main__":
-    # استفاده از app.run_webhook به جای asyncio.run()
-    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
+    app = ApplicationBuilder().token(TOKEN).build()  # اضافه کردن تعریف app
+    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")  # استفاده از app به درستی
