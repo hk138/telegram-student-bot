@@ -1,7 +1,7 @@
 import os
 import requests
 import time
-import telegram  # این خط باید اضافه شود
+import telegram
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -38,6 +38,12 @@ questions = [
     "۲۴. چند روز در هفته دوست داری مرخصی داشته باشی؟",
     "۲۵. آیا ترجیح می‌دی برنامه‌ریزی دقیق دقیقه‌ای باشه یا فقط کلی؟"
 ]
+
+# تابع start برای خوش‌آمدگویی
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    await update.message.reply_text(f"سلام! برای شروع مشاوره، به چند سوال جواب بده 🌟\n\nآیدی کاربر: {user_id}")
+    await update.message.reply_text(questions[0])
 
 # حذف Webhook قبلی
 def delete_webhook():
