@@ -2,6 +2,7 @@ import os
 import asyncpg
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+import asyncio
 
 # تنظیمات
 user_data = {}
@@ -9,7 +10,8 @@ ADMIN_ID = int(os.getenv("ADMIN_ID"))
 ADMIN_FORUM_ID = os.getenv("ADMIN_FORUM_ID")
 TOKEN = os.getenv("BOT_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
-WEBHOOK_URL =  os.getenv("WEBHOOK_URL")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+
 # پرسش‌ها
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
@@ -44,7 +46,7 @@ async def get_db_connection():
     conn = await asyncpg.connect(DATABASE_URL)
     return conn
 
-# ساخت جداول در دیتابیس
+# ایجاد جداول در دیتابیس
 async def create_tables():
     conn = await get_db_connection()
     await conn.execute("""
@@ -119,103 +121,26 @@ async def send_message_to_forum(user_id, text, topic_id):
         message_thread_id=topic_id
     )
 
-# شروع ربات
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    print("ربات اجرا شد...")
-
-# تعریف تابع غیرهمزمان
+# تنظیم Webhook
 async def set_webhook():
     await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
 
-if __name__ == "__main__":
+# تابع اصلی
+async def main():
+    global app
     app = ApplicationBuilder().token(TOKEN).build()
 
     # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
-    import asyncio
-    asyncio.run(set_webhook())
+    await set_webhook()
 
+    # افزودن هندلرها
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # اجرای ربات به صورت Webhook
     print("ربات فعال است و Webhook تنظیم شد...")
-    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
+    await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
-
-async def ensure_topic_for_user(user):
-    user_id = user.id
-    conn = await get_db_connection()
-    result = await conn.fetch('SELECT topic_id FROM users WHERE user_id=$1', user_id)
-    if result:
-        return result[0]["topic_id"]
-
-    # اگر موضوع ندارند، یکی بساز
-    title = f"{user.first_name or ''} {user.username or ''} | {user_id}"
-    created = await bot.telegram.create_forum_topic(ADMIN_FORUM_ID, title)
-    topic_id = created['message_thread_id']
-
-    # ذخیره در دیتابیس
-    await conn.execute(
-        'INSERT INTO users(user_id, username, first_name, topic_id) VALUES($1, $2, $3, $4)',
-        user_id, user.username, user.first_name, topic_id
-    )
-    return topic_id
-
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id not in user_data:
-        await update.message.reply_text("لطفاً اول /start رو بزن 😊")
-        return
-
-    data = user_data[user_id]
-    step = data["step"]
-    data["answers"].append(update.message.text)
-    step += 1
-
-    # گرفتن topic_id و ارسال پیام به فوروم
-    topic_id = await ensure_topic_for_user(update.effective_user)
-    await bot.telegram.send_message(
-        ADMIN_FORUM_ID, 
-        f"👤 {update.effective_user.first_name or ''} {update.effective_user.username or ''}\n{update.message.text}",
-        message_thread_id=topic_id
-    )
-    # ذخیره پیام در دیتابیس
-    await pool.query(
-        'INSERT INTO messages(user_id, direction, text) VALUES($1,$2,$3)', 
-        [user_id, 'IN', update.message.text]
-    )
-
-    if step < len(questions):
-        data["step"] = step
-        await update.message.reply_text(questions[step])
-    else:
-        await update.message.reply_text("✅ مشاوره ثبت شد!")
-        del user_data[user_id]
-
-
-async def handle_admin_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.id != ADMIN_FORUM_ID:
-        return
-    if not update.message.message_thread_id:
-        return
-    if update.message.from_user.is_bot:
-        return
-
-    # پیدا کردن user_id برای تاپیک
-    result = await pool.query('SELECT user_id FROM users WHERE topic_id=$1', [update.message.message_thread_id])
-    if result.rowCount == 0:
-        return
-    user_id = result.rows[0].user_id
-
-    # ارسال پیام به کاربر
-    await bot.telegram.send_message(user_id, update.message.text)
-    await pool.query(
-        'INSERT INTO messages(user_id, direction, text) VALUES($1, $2, $3)', 
-        [user_id, 'OUT', update.message.text]
-    )
+# اجرای حلقه رویداد
+if __name__ == "__main__":
+    asyncio.run(main())
