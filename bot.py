@@ -1,7 +1,7 @@
 import os
 import requests
 import time
-import asyncio
+import telegram  # این خط باید اضافه شود
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
