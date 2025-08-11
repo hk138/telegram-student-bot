@@ -97,7 +97,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ارسال اطلاعات به ادمین
         answer_text = "\n".join([f"{i+1}. {questions[i]} \n➤ {ans}" for i, ans in enumerate(data["answers"])])
-
         await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 مشاوره جدید از کاربر {user_id}:\n\n{answer_text}")
 
         # ارسال به گروه فوروم
@@ -121,14 +120,15 @@ async def send_message_to_forum(user_id, text, topic_id):
         message_thread_id=topic_id
     )
 
+# تابع تنظیم Webhook
+async def set_webhook_async():
+    await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
+
 # شروع ربات
 if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # تنظیم Webhook
-    async def set_webhook_async():
-        await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
-
+    # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
     import asyncio
     asyncio.run(set_webhook_async())  # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
 
