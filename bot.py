@@ -93,5 +93,6 @@ async def main():
     await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
 if __name__ == "__main__":
+    # استفاده از app.run_webhook به جای asyncio.run
     import asyncio
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
