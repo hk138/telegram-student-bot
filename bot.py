@@ -1,5 +1,6 @@
 import os
 import asyncpg
+import requests
 import asyncio
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
@@ -121,8 +122,20 @@ async def send_message_to_forum(user_id, text, topic_id):
         message_thread_id=topic_id
     )
 
+# حذف Webhook قبلی
+def delete_webhook():
+    url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
+    response = requests.get(url)
+    print(response.json())  # چاپ پاسخ برای اطمینان از حذف Webhook
+
+# تنظیم Webhook جدید
+def set_webhook():
+    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}/webhook"
+    response = requests.get(url)
+    print(response.json())  # چاپ پاسخ برای اطمینان از تنظیم Webhook
+
 # تنظیم Webhook
-async def set_webhook():
+async def set_webhook_async():
     await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
 
 # تابع اصلی
@@ -130,8 +143,12 @@ async def main():
     global app
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # حذف Webhook قبلی و سپس تنظیم Webhook جدید
+    delete_webhook()  # حذف Webhook قبلی
+    set_webhook()     # تنظیم Webhook جدید
+
     # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
-    await set_webhook()
+    await set_webhook_async()
 
     # افزودن هندلرها
     app.add_handler(CommandHandler("start", start))
@@ -141,7 +158,7 @@ async def main():
     print("ربات فعال است و Webhook تنظیم شد...")
     await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
-# اجرای ربات به صورت Webhook
+# شروع ربات
 if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()  # اضافه کردن تعریف app
-    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")  # استفاده از app به درستی
+    import asyncio
+    asyncio.run(main())
