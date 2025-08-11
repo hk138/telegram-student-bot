@@ -91,6 +91,6 @@ async def main():
     await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
 if __name__ == "__main__":
-    # استفاده مستقیم از app.run_webhook() به جای asyncio.run()
-    print("ربات در حال راه‌اندازی است...")
-    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
+    # حالا قبل از اجرای `app.run_webhook()`, ابتدا باید `app` را به درستی تعریف کرده باشیم
+    import asyncio
+    asyncio.run(main())  # استفاده از asyncio.run برای شروع برنامه
