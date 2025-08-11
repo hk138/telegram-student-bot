@@ -1,12 +1,15 @@
 import os
-import requests
-from telegram import Update
+import asyncpg
+from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # تنظیمات
+user_data = {}
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
+ADMIN_FORUM_ID = os.getenv("ADMIN_FORUM_ID")
 TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = "https://sublime-success.up.railway.app"  # URL Webhook شما باید از HTTPS استفاده کند
-ADMIN_ID = os.getenv("ADMIN_ID")
+DATABASE_URL = os.getenv("DATABASE_URL")
+WEBHOOK_URL = "https://telegram-student-bot-production.up.railway.app"  # URL جدید Webhook
 
 # پرسش‌ها
 questions = [
@@ -37,67 +40,102 @@ questions = [
     "۲۵. آیا ترجیح می‌دی برنامه‌ریزی دقیق دقیقه‌ای باشه یا فقط کلی؟"
 ]
 
-# تابع start برای خوش‌آمدگویی
+# اتصال به دیتابیس PostgreSQL با asyncpg
+async def get_db_connection():
+    conn = await asyncpg.connect(DATABASE_URL)
+    return conn
+
+# ساخت جداول در دیتابیس
+async def create_tables():
+    conn = await get_db_connection()
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            user_id BIGINT PRIMARY KEY,
+            username TEXT,
+            first_name TEXT,
+            topic_id BIGINT,
+            created_at TIMESTAMP DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS messages(
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT REFERENCES users(user_id),
+            direction TEXT, -- 'IN' از سمت کاربر، 'OUT' از سمت شما/بات
+            text TEXT,
+            ts TIMESTAMP DEFAULT NOW()
+        );
+    """)
+    await conn.close()
+
+# ذخیره اطلاعات کاربران در حافظه
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    await update.message.reply_text(f"سلام! برای شروع مشاوره، به چند سوال جواب بده 🌟\n\nآیدی کاربر: {user_id}")
+    user_data[user_id] = {"step": 0, "answers": []}
+    await update.message.reply_text("سلام! برای شروع مشاوره، به چند سوال جواب بده 🌟")
     await update.message.reply_text(questions[0])
-
-# حذف Webhook قبلی
-def delete_webhook():
-    url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
-    response = requests.get(url)
-    print(response.json())  # چاپ پاسخ برای اطمینان از حذف Webhook
-
-# تنظیم Webhook جدید
-def set_webhook():
-    url = f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={WEBHOOK_URL}/webhook"
-    response = requests.get(url)
-    print(response.json())  # چاپ پاسخ برای اطمینان از تنظیم Webhook
-
-# تابع غیرهمزمان برای تنظیم Webhook با Retry در صورت خطای Rate Limit
-async def set_webhook_async():
-    try:
-        # تلاش برای تنظیم Webhook
-        await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
-    except telegram.error.RetryAfter as e:
-        print(f"Rate limit exceeded. Retrying after {e.retry_after} seconds...")
-        time.sleep(e.retry_after)  # صبر کردن به مدت مشخص شده
-        await set_webhook_async()  # دوباره تلاش کردن
 
 # هندل کردن پیام‌های کاربر
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    await update.message.reply_text(f"پیام شما دریافت شد, آیدی کاربر: {user_id}")
+    if user_id not in user_data:
+        await update.message.reply_text("لطفاً اول /start رو بزن 😊")
+        return
+
+    data = user_data[user_id]
+    step = data["step"]
+    data["answers"].append(update.message.text)
+    step += 1
+
+    if step < len(questions):
+        data["step"] = step
+        await update.message.reply_text(questions[step])
+    else:
+        await update.message.reply_text(
+            "✅ مشاوره ثبت شد!\n"
+            f"🧑‍🎓 اطلاعات مربوط به آیدی کاربر: {user_id}\n"
+            "✳️ در حال پردازش برنامه‌ریزی هستیم، تا چند دقیقه دیگه برنامه اختصاصی‌ت آماده می‌شه."
+        )
+
+        # ارسال اطلاعات به ادمین
+        answer_text = "\n".join([f"{i+1}. {questions[i]} \n➤ {ans}" for i, ans in enumerate(data["answers"])])
+
+        await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 مشاوره جدید از کاربر {user_id}:\n\n{answer_text}")
+
+        # ارسال به گروه فوروم
+        topic_id = await ensure_topic_for_user(user_id)
+        await send_message_to_forum(user_id, answer_text, topic_id)
+
+        del user_data[user_id]
+
+# بررسی یا ایجاد topic برای هر کاربر در گروه فوروم
+async def ensure_topic_for_user(user_id):
+    # اینجا کد برای گرفتن یا ایجاد topic_id مربوط به کاربر قرار می‌گیره
+    return user_id  # برای مثال برگشت دادن همان user_id به عنوان topic_id
+
+# ارسال پیام به گروه فوروم
+async def send_message_to_forum(user_id, text, topic_id):
+    bot = Bot(token=TOKEN)
+    message = f"👤 {user_id} :\n{text}"
+    await bot.telegram.send_message(
+        chat_id=ADMIN_FORUM_ID,
+        text=message,
+        message_thread_id=topic_id
+    )
 
 # شروع ربات
-async def main():
-    global app
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    # حذف Webhook قبلی و سپس تنظیم Webhook جدید
-    delete_webhook()  # حذف Webhook قبلی
-    set_webhook()     # تنظیم Webhook جدید
-
-    # افزودن هندلرها
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # اجرای ربات به صورت Webhook
-    print("ربات فعال است و Webhook تنظیم شد...")
-    await set_webhook_async()  # استفاده از set_webhook با تأخیر در صورت نیاز
-    await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
-
 if __name__ == "__main__":
-    # اطمینان از استفاده از HTTPS در URL Webhook
-    if not WEBHOOK_URL.startswith("https://"):
-        raise ValueError("Webhook URL must use HTTPS. Please ensure that your URL is secure.")
-    
-    # حذف استفاده از asyncio.run و اجرای مستقیم Webhook
-    print("ربات در حال راه‌اندازی است...")
     app = ApplicationBuilder().token(TOKEN).build()
+
+    # تنظیم Webhook
+    async def set_webhook_async():
+        await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
+
+    import asyncio
+    asyncio.run(set_webhook_async())  # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("ربات فعال است و Webhook تنظیم شد...")
 
     # اجرای ربات به صورت Webhook
     app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
