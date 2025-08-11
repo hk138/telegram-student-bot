@@ -81,18 +81,16 @@ async def main():
     delete_webhook()  # حذف Webhook قبلی
     set_webhook()     # تنظیم Webhook جدید
 
-    # اجرای ربات به صورت Webhook
-    print("ربات فعال است و Webhook تنظیم شد...")
-    await set_webhook_async()  # استفاده از set_webhook با تأخیر در صورت نیاز
-
     # افزودن هندلرها
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     # اجرای ربات به صورت Webhook
+    print("ربات فعال است و Webhook تنظیم شد...")
+    await set_webhook_async()  # استفاده از set_webhook با تأخیر در صورت نیاز
     await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
 if __name__ == "__main__":
-    # استفاده از app.run_webhook به جای asyncio.run
-    import asyncio
-    asyncio.get_event_loop().run_until_complete(main())
+    # استفاده مستقیم از app.run_webhook() به جای asyncio.run()
+    print("ربات در حال راه‌اندازی است...")
+    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
