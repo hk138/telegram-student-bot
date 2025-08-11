@@ -1,13 +1,12 @@
 import os
 import requests
 import time
-import telegram
 from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 # تنظیمات
 TOKEN = os.getenv("BOT_TOKEN")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # اطمینان حاصل کنید که این URL از HTTPS استفاده می‌کند
 ADMIN_ID = os.getenv("ADMIN_ID")
 
 # پرسش‌ها
@@ -91,6 +90,10 @@ async def main():
     await app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
 
 if __name__ == "__main__":
+    # اطمینان از استفاده از HTTPS در URL Webhook
+    if not WEBHOOK_URL.startswith("https://"):
+        raise ValueError("Webhook URL must use HTTPS. Please ensure that your URL is secure.")
+    
     # حذف استفاده از asyncio.run و اجرای مستقیم Webhook
     print("ربات در حال راه‌اندازی است...")
     app = ApplicationBuilder().token(TOKEN).build()
