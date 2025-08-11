@@ -138,4 +138,6 @@ if __name__ == "__main__":
     print("ربات فعال است و Webhook تنظیم شد...")
 
     # اجرای ربات به صورت Webhook
-    app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook")
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(app.run_webhook(listen="0.0.0.0", port=5000, url_path="/webhook"))
