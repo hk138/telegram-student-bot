@@ -121,7 +121,7 @@ async def send_message_to_forum(user_id, text, topic_id):
     )
 
 # تابع تنظیم Webhook
-async def set_webhook_async():
+async def set_webhook_async(app):
     await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
 
 # شروع ربات
@@ -129,7 +129,7 @@ async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
-    await set_webhook_async()  # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
+    await set_webhook_async(app)  # اجرای تابع تنظیم Webhook به صورت غیرهمزمان
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
