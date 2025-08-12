@@ -11,7 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# لاگ برای دیباگ
+# لاگ برای دیباگ بهتر
 logging.basicConfig(level=logging.INFO)
 
 # متغیرهای محیطی
@@ -20,15 +20,18 @@ WEBHOOK_HOST = "https://telegram-student-bot-production.up.railway.app"
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
+# اپلیکیشن تلگرام (global)
+application = None
+
 # ذخیره‌سازی اطلاعات کاربران
 user_data = {}
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
     "۲. رشته‌ت چیه؟ (ریاضی / تجربی / انسانی / هنر / زبان)",
-    # می‌تونی سوالات بیشتر اضافه کنی
+    # سوالات بیشتر...
 ]
 
-# شروع ربات
+# استارت
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data[user_id] = {"step": 0, "answers": []}
@@ -36,7 +39,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(questions[0])
     logging.info(f"✅ /start توسط کاربر {user_id}")
 
-# دریافت پیام‌ها
+# پاسخ به پیام‌ها
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     logging.info(f"📨 پیام دریافت شد از {user_id}: {update.message.text}")
@@ -56,12 +59,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.info(f"📋 پاسخ‌های {user_id}: {data['answers']}")
         del user_data[user_id]
 
-# هندل وبهوک
+# هندل کردن Webhook
 async def handle_webhook(request):
-    data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
-    return web.Response()
+    try:
+        data = await request.json()
+        update = Update.de_json(data, application.bot)
+        asyncio.create_task(application.process_update(update))  # مستقل اجرا کن
+        return web.Response(text="OK")
+    except Exception as e:
+        logging.error(f"❌ خطا در Webhook: {e}")
+        import traceback
+        traceback.print_exc()
+        return web.Response(status=500, text="Internal Server Error")
 
 # اجرای اصلی
 async def main():
@@ -69,12 +78,13 @@ async def main():
 
     application = ApplicationBuilder().token(TOKEN).build()
 
-    # هندلرها
+    # افزودن هندلرها
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # تنظیم وبهوک
+    # ثبت Webhook
     await application.bot.set_webhook(WEBHOOK_URL)
+    print(f"📡 Webhook تنظیم شد: {WEBHOOK_URL}")
 
     # سرور aiohttp برای Railway
     app = web.Application()
@@ -87,8 +97,7 @@ async def main():
 
     print("✅ ربات فعال است و در حال دریافت پیام از Webhook...")
 
-    # منتظر بمان
-    await asyncio.Event().wait()
+    await asyncio.Event().wait()  # اجرا در حالت دائمی
 
 # اجرای برنامه
 if __name__ == "__main__":
