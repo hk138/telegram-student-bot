@@ -1,32 +1,28 @@
 import os
-import asyncpg
 import asyncio
-from telegram import Update, Bot
+from aiohttp import web
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
-# --- تنظیمات ---
 TOKEN = os.getenv("BOT_TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))
-ADMIN_FORUM_ID = os.getenv("ADMIN_FORUM_ID")
-WEBHOOK_URL = "https://telegram-student-bot-production.up.railway.app"
+WEBHOOK_HOST = "https://telegram-student-bot-production.up.railway.app"
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 user_data = {}
 
-# --- سوالات ---
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
     "۲. رشته‌ت چیه؟ (ریاضی / تجربی / انسانی / هنر / زبان)",
-    # ... ادامه سوال‌ها ...
+    # ادامه بده...
 ]
 
-# --- هندلرها ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_data[user_id] = {"step": 0, "answers": []}
@@ -46,36 +42,38 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data["step"] < len(questions):
         await update.message.reply_text(questions[data["step"]])
     else:
-        await update.message.reply_text("✅ مشاوره ثبت شد! در حال ارسال اطلاعات به مشاور...")
-
-        summary = "\n".join(
-            f"{i + 1}. {questions[i]}\n➤ {ans}" for i, ans in enumerate(data["answers"])
-        )
-
-        await context.bot.send_message(chat_id=ADMIN_ID, text=f"📥 مشاوره جدید:\n{summary}")
-        await context.bot.send_message(chat_id=ADMIN_FORUM_ID, text=summary)
-
+        await update.message.reply_text("✅ مشاوره ثبت شد! منتظر پاسخ مشاور باش 🌟")
         del user_data[user_id]
 
-# --- ساخت و اجرای اپلیکیشن ---
+async def handle_webhook(request):
+    data = await request.json()
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
+    return web.Response()
+
 async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
+    global application
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application = ApplicationBuilder().token(TOKEN).build()
 
-    await app.bot.set_webhook(WEBHOOK_URL + "/webhook")
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("✅ ربات فعال است و Webhook تنظیم شد...")
+    # تنظیم Webhook
+    await application.bot.set_webhook(WEBHOOK_URL)
 
-    await app.run_webhook(
-        listen="0.0.0.0",
-        port=5000,
-        url_path="/webhook",
-    )
+    app = web.Application()
+    app.router.add_post(WEBHOOK_PATH, handle_webhook)
 
-# --- اجرای بدون استفاده از asyncio.run ---
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 5000)
+    await site.start()
+
+    print("✅ ربات فعال است و در حال دریافت پیام از Webhook...")
+
+    # بدون بستن حلقه، صبر کن
+    await asyncio.Event().wait()
+
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
-    loop.run_forever()
+    asyncio.run(main())
