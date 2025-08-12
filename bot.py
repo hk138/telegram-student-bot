@@ -11,31 +11,35 @@ from telegram.ext import (
     filters,
 )
 
-# تنظیمات لاگ
+# لاگ برای دیباگ
 logging.basicConfig(level=logging.INFO)
 
-# توکن ربات و اطلاعات Webhook
+# متغیرهای محیطی
 TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = "https://telegram-student-bot-production.up.railway.app"
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-# آیدی عددی گروه مشاور
+# آیدی عددی مشاور
 ADVISOR_CHAT_ID = 6899358433
 
-# اطلاعات کاربران و سوالات
+# ذخیره‌سازی اطلاعات کاربران
 user_data = {}
 questions = [
-    "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
-    "۲. رشته‌ت چیه؟ (ریاضی / تجربی / انسانی / هنر / زبان)",
-    "۳. سطح درس‌هات در حال حاضر چطوره؟ (ضعیف / متوسط / قوی)",
-    "۴. روزی چند ساعت مطالعه می‌کنی؟",
-    "۵. بیشتر با چه درسی مشکل داری؟",
-    "۶. هدف اصلی‌ت از مشاوره چیه؟",
-    "۷. چند ساعت گوشی استفاده می‌کنی در روز؟",
-    "۸. آزمون خاصی شرکت می‌کنی؟ (قلمچی / گزینه۲ / بدون آزمون)",
-    "۹. آیا کلاس یا معلم خصوصی هم داری؟",
-    "۱۰. چند ساعت وقت آزاد واقعی در روز داری برای درس خوندن؟",
+    "سلام! پایه تحصیلی‌ات چیه؟ (دهم، یازدهم، دوازدهم)",
+    "چه رشته ای هستی؟",
+    "هدفت از درس خوندن چیه؟",
+    "چند ساعت در روز درس می‌خونی؟",
+    "نقاط قوتت چیه؟",
+    "نقاط ضعفت چیه؟",
+    "چرا بعضی وقتا حس درس خوندن نداری؟",
+    "آزمون خاصی شرکت می‌کنی؟ (قلمچی، گزینه دو...)",
+    "آخرین نتیجه آزمونت چطور بود؟ (تراز، رتبه... اگه داشتی)",
+    "چه روش یادگیری رو ترجیح می‌دی؟ (مطالعه، دیدن ویدیو...)",
+    "به چه رشته‌ای علاقه‌مندی؟",
+    "دوست داری کدوم دانشگاه قبول بشی؟",
+    "صبح‌ها یا شب‌ها انرژی بیشتری برای درس داری؟",
+    "منابعی که داری رو کامل بنویس (مثلاً برای ریاضی مهر و ماه، برای شیمی خیلی سبز...)"
 ]
 
 # شروع ربات
@@ -46,62 +50,50 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(questions[0])
     logging.info(f"✅ /start توسط کاربر {user_id}")
 
-# هندل پیام‌ها
+# دریافت پیام‌ها
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text = update.message.text
-    logging.info(f"📨 پیام از {user_id}: {text}")
+    message = update.message.text
+    logging.info(f"📨 پیام از {user_id}: {message}")
 
     if user_id not in user_data:
         await update.message.reply_text("لطفاً اول /start رو بزن 😊")
         return
 
     data = user_data[user_id]
-    data["answers"].append(text)
+    data["answers"].append(message)
     data["step"] += 1
 
     if data["step"] < len(questions):
         await update.message.reply_text(questions[data["step"]])
     else:
-        await update.message.reply_text("✅ مشاوره ثبت شد! منتظر پاسخ مشاور باش 🌟")
+        summary = f"📥 پاسخ‌های جدید از کاربر {user_id}:\n"
+        for i, answer in enumerate(data["answers"]):
+            summary += f"{i+1}. {questions[i]}\nپاسخ: {answer}\n\n"
+        await context.bot.send_message(chat_id=ADVISOR_CHAT_ID, text=summary)
+        await update.message.reply_text("✅ پاسخ‌ها ثبت شد. لطفاً به آیدی @HAdiHadiKH پیام \"سلام\" بده تا مشاوره‌ت بررسی بشه. نتیجه پس از چند ساعت آماده خواهد بود 🌟")
+        del user_data[user_id]
 
-        # ارسال پاسخ‌ها برای مشاور
-        message = f"📋 پاسخ‌های کاربر {user_id}:\n\n"
-        for i, q in enumerate(questions):
-            message += f"{q}\n➖ {data['answers'][i]}\n\n"
-
-        await context.bot.send_message(chat_id=ADVISOR_CHAT_ID, text=message)
-        user_data[user_id] = {"step": len(questions), "answers": data["answers"]}
-
-# بعد از اتمام فرم، هر پیام جدید هم برای مشاور ارسال می‌شود
-async def forward_to_advisor(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id in user_data and user_data[user_id]["step"] == len(questions):
-        msg = f"📨 پیام جدید از {user_id}:\n{update.message.text}"
-        await context.bot.send_message(chat_id=ADVISOR_CHAT_ID, text=msg)
-
-# هندل Webhook
+# هندل وبهوک
 async def handle_webhook(request):
     data = await request.json()
     update = Update.de_json(data, application.bot)
+    await application.initialize()
     await application.process_update(update)
     return web.Response()
 
-# اجرای برنامه
+# اجرای اصلی
 async def main():
     global application
 
     application = ApplicationBuilder().token(TOKEN).build()
 
-    # اضافه کردن هندلرها
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, forward_to_advisor))
 
     await application.initialize()
     await application.bot.set_webhook(WEBHOOK_URL)
 
-    # راه‌اندازی سرور aiohttp
     app = web.Application()
     app.router.add_post(WEBHOOK_PATH, handle_webhook)
 
