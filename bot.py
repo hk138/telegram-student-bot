@@ -107,7 +107,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # بررسی یا ایجاد topic برای هر کاربر در گروه فوروم
 async def ensure_topic_for_user(user_id):
-    # اینجا کد برای گرفتن یا ایجاد topic_id مربوط به کاربر قرار می‌گیره
     return user_id  # برای مثال برگشت دادن همان user_id به عنوان topic_id
 
 # ارسال پیام به گروه فوروم
