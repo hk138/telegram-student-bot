@@ -11,95 +11,88 @@ from telegram.ext import (
     filters,
 )
 
-# تنظیم لاگ برای دیباگ
+# تنظیم لاگ‌ها
 logging.basicConfig(level=logging.INFO)
 
-# تنظیمات Webhook
+# توکن و وبهوک
 TOKEN = os.getenv("BOT_TOKEN")
 WEBHOOK_HOST = "https://telegram-student-bot-production.up.railway.app"
 WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
-# سراسری
-application = None
-user_data = {}
+# آیدی عددی مشاور (سوپرگروه یا چت خصوصی)
+ADVISOR_CHAT_ID = 6899358433
 
-# ✅ سوالات کامل
+# دیتای کاربران و سوال‌ها
+user_data = {}
 questions = [
     "۱. پایه تحصیلی‌ت چیه؟ (دهم / یازدهم / دوازدهم)",
     "۲. رشته‌ت چیه؟ (ریاضی / تجربی / انسانی / هنر / زبان)",
-    "۳. معدل سال قبلت چقدر بود؟",
-    "۴. مدرسه‌ت چه نوعیه؟ (دولتی / نمونه / تیزهوشان / غیرانتفاعی)",
-    "۵. در چه دروسی قوی‌تر هستی؟",
-    "۶. در چه دروسی ضعیف‌تری؟",
-    "۷. هدفت برای کنکور چیه؟ (رشته و دانشگاه)",
-    "۸. روزانه چند ساعت درس می‌خونی؟",
-    "۹. تایم آزاد دیگه‌ت چقدر هست؟",
-    "۱۰. از چه منابع کمک‌آموزشی استفاده می‌کنی؟",
-    "۱۱. مشاور یا برنامه‌ریزی خاصی تا حالا داشتی؟",
-    "۱۲. نقاط قوتت توی درس خوندن چیه؟",
-    "۱۳. به نظرت بزرگترین چالش در مسیر درس خوندن‌ت چیه؟",
-    "۱۴. آیا به کلاس‌های آنلاین یا حضوری علاقه داری؟",
-    "۱۵. سبک یادگیری‌ت چطوریه؟ (دیداری / شنیداری / عملی)",
-    "۱۶. می‌خوای چند ساعت در روز مشاوره یا پیگیری داشته باشی؟",
-    "۱۷. آیا از اپلیکیشن یا دفتر برنامه‌ریزی استفاده می‌کنی؟",
-    "۱۸. انتظارت از مشاور چیه؟",
-    "۱۹. مورد خاص دیگه‌ای هست که دوست داری مشاور بدونه؟",
+    "۳. معدل سال قبلت چنده؟",
+    "۴. روزی چند ساعت درس می‌خونی؟",
+    "۵. چه درس‌هایی برات سخته؟",
+    "۶. چه درس‌هایی رو دوست داری؟",
+    "۷. مشاوره قبلاً داشتی؟ (بله / خیر)",
+    "۸. منبع درسی خاصی استفاده می‌کنی؟",
+    "۹. برنامه خاصی برای کنکور داری؟",
+    "۱۰. دوست داری چجوری راهنمایی‌ت کنیم؟",
 ]
 
-# شروع ربات
+# شروع گفتگو
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user_data[user_id] = {"step": 0, "answers": []}
+    full_name = update.effective_user.full_name
+    user_data[user_id] = {"step": 0, "answers": [], "name": full_name}
     await update.message.reply_text("سلام! برای شروع مشاوره، به چند سوال جواب بده 🌟")
     await update.message.reply_text(questions[0])
-    logging.info(f"✅ /start توسط کاربر {user_id}")
+    logging.info(f"✅ /start توسط کاربر {user_id} ({full_name})")
 
-# مدیریت پاسخ‌ها
+# پاسخ‌دهی به سوال‌ها
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    logging.info(f"📨 پیام از {user_id}: {update.message.text}")
+    message = update.message.text
 
     if user_id not in user_data:
         await update.message.reply_text("لطفاً اول /start رو بزن 😊")
         return
 
     data = user_data[user_id]
-    data["answers"].append(update.message.text)
+    data["answers"].append(message)
     data["step"] += 1
 
     if data["step"] < len(questions):
         await update.message.reply_text(questions[data["step"]])
     else:
         await update.message.reply_text("✅ مشاوره ثبت شد! منتظر پاسخ مشاور باش 🌟")
-        logging.info(f"📋 پاسخ‌های {user_id}: {data['answers']}")
+
+        # ارسال پیام به مشاور
+        full_name = data["name"]
+        answers = data["answers"]
+        msg = f"📥 مشاوره جدید از {full_name} (ID: {user_id}):\n\n"
+        for i, q in enumerate(questions):
+            msg += f"{q}\n📝 {answers[i]}\n\n"
+        await context.bot.send_message(chat_id=ADVISOR_CHAT_ID, text=msg)
+
+        logging.info(f"📋 پاسخ‌های {user_id}: {answers}")
         del user_data[user_id]
 
-# هندل Webhook
+# هندل وبهوک
 async def handle_webhook(request):
-    try:
-        data = await request.json()
-        update = Update.de_json(data, application.bot)
-        await application.process_update(update)
-        return web.Response(text="OK")
-    except Exception as e:
-        logging.error(f"❌ خطا در Webhook: {e}")
-        import traceback
-        traceback.print_exc()
-        return web.Response(status=500, text="Internal Server Error")
+    data = await request.json()
+    update = Update.de_json(data, application.bot)
+    await application.initialize()  # نیاز به initialize در ورژن جدید
+    await application.process_update(update)
+    return web.Response()
 
 # تابع اصلی
 async def main():
     global application
-
     application = ApplicationBuilder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    await application.initialize()
     await application.bot.set_webhook(WEBHOOK_URL)
-    print(f"📡 Webhook تنظیم شد: {WEBHOOK_URL}")
 
     app = web.Application()
     app.router.add_post(WEBHOOK_PATH, handle_webhook)
@@ -110,9 +103,7 @@ async def main():
     await site.start()
 
     print("✅ ربات فعال است و در حال دریافت پیام از Webhook...")
-
     await asyncio.Event().wait()
 
-# اجرا
 if __name__ == "__main__":
     asyncio.run(main())
