@@ -21,7 +21,7 @@ WEBHOOK_PATH = "/webhook"
 WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 
 # آیدی عددی مشاور
-ADVISOR_CHAT_ID = 6899358433
+ADVISOR_CHAT_ID = 7796471908
 
 # ذخیره‌سازی اطلاعات کاربران
 user_data = {}
@@ -73,7 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, answer in enumerate(data["answers"]):
             summary += f"{i+1}. {questions[i]}\nپاسخ: {answer}\n\n"
         await context.bot.send_message(chat_id=ADVISOR_CHAT_ID, text=summary)
-        await update.message.reply_text("✅ پاسخ‌ها ثبت شد. لطفاً به آیدی @HAdiHadiKH پیام \"سلام\" بده تا مشاوره‌ت بررسی بشه. نتیجه پس از چند ساعت آماده خواهد بود 🌟")
+        await update.message.reply_text("✅ پاسخ‌ها ثبت شد. لطفاً به آیدی @Daneshgosho پیام \"سلام\" بده تا مشاوره‌ت بررسی بشه. نتیجه پس از چند ساعت آماده خواهد بود 🌟")
         del user_data[user_id]
 
 # هندل وبهوک
